@@ -1,95 +1,21 @@
-import os
+import configparser
 import discord
+import os
+from games.games import Games
+
+config_file = "config.ini"
+
+print("Reading Config file")
+config = configparser.ConfigParser()
+config.read_file(open(config_file))
 
 print("Initializing Discord Bot")
 client = discord.Client()
 
-games_category_name = "Games"
-game_channel_approver_role_name = "Game Approver"
-games_channels = {}
-games_roles = {}
+games_name = config["Games"]["name"]
+games_category_name = config["Games"]["category_name"]
+games = Games(games_name, games_category_name)
 
-helpmessage = """
-Hi {user.mention} I'm here to help!
-Please use all commands here in our DM.
-
-Here are available commands:
-General:
-!help                   Gets you this help message!
-
-Games:
-!games                  Gives you a list of all available game channels
-!join game <name>       Join a specific game channel
-!leave game <name>      Leave a specific game channel
-"""
-
-async def populate_categories():
-    print("Updating category list.")
-    
-    #Get Games Category ID
-    games_category_id = discord.utils.get(client.guilds[0].categories, name=games_category_name).id
-
-    for channel in client.guilds[0].channels:
-        #Populate game category
-        if channel.category_id == games_category_id:
-            games_channels[channel.name] = channel
-    
-    print("Found the following game channels:")
-    print(games_channels)
-
-async def get_games_list():
-    val = ""
-
-    for key in games_channels:
-        val += key + "\n"
-    
-    return val
-
-async def get_role(role_type, name):
-    print("We are looking for a role called {role_type}-{name}".format(role_type=role_type, name=name))
-    #Update roles before searching
-    await get_existing_roles()
-
-    role = None
-
-    if role_type == "game":
-        if name in games_roles:
-            role = games_roles[name]
-
-    print("Here's the role we are returning: {role}".format(role=role))
-    return role
-
-async def get_existing_roles():
-    print("Updating current roles.")
-
-    for role in client.guilds[0].roles:
-        if role.name.startswith("game-"):
-            game_name = role.name[5:]
-            games_roles[game_name] = role
-    
-    print("We found the following game roles:")
-    print(games_roles)
-
-async def create_role(role_type, game_name):
-    role_name = role_type + "-" + game_name
-    print("Creating role {role}".format(role=role_name))
-    
-    #Create role
-    role = await client.guilds[0].create_role(name=role_name)
-
-    #add to games_roles DB
-    games_roles[game_name] = role
-
-    #return the new role
-    return role
-
-async def create_missing_roles():
-    print("We are looking for roles we need to create.")
-    for game in games_channels:
-        if game not in games_roles:
-            new_role = await create_role("game", game)
-
-            await (games_channels[game]).set_permissions(new_role, read_messages=True, send_messages=True, read_message_history=True)
 
 async def userToMember(user):
     print("We are trying to convert {user} to a member.".format(user=user))
@@ -114,76 +40,38 @@ async def does_member_have_role(member, role):
     print("They do not have the role!")
     return False
 
-async def join_role(user, role_type, name):
-    print("{user} has requested to join {role_type}-{name}.".format(user=user, role_type=role_type, name=name))
+async def join_role(member, role):
+    print("We are adding {member} to '{role}'.".format(member=member, role=role))
 
-    #Prepare everything we need to join the role
-    role_to_add = await get_role(role_type, name)
-    member = await userToMember(user)
-
-    #Is the user a member of the server?
-    if member is None:
-        print("User membership not found.")
-        await user.send("We could find your membership to a server!")
-        return
-
-    #We couldn't find the role, tell the user and do nothing
-    if role_to_add is None:
-        print("Role not found.")
-        await user.send("We couldn't find a matching {role_type} for '{name}'".format(role_type=role_type, name=name))
-        return
-
-    #Check if they already have the role, tell the user and do nothing if they do
-    has_role = await does_member_have_role(member, role_to_add)
-    if has_role:
-        await user.send("You are already a member of that {role_type}!".format(role_type=role_type))
-        return
-
-    #Finally, add them to the role
-    print("Adding {user} to {role_type}-{name}".format(user=member.name, role_type=role_type, name=name))
-    await member.add_roles(role_to_add)
-    await user.send("You have been added to the {role_type}!".format(role_type=role_type))
-
-async def leave_role(user, role_type, name):
-    print("{user} has requested to leave {role_type}-{name}.".format(user=user, role_type=role_type, name=name))
-
-    #prepare everything we need to leave the role
-    role_to_remove = await get_role(role_type, name)
-    member = await userToMember(user)
-
-    #Is the user a member of the server?
-    if member is None:
-        print("User membership not found.")
-        await user.send("We could find your membership to a server!")
-        return
+    await member.add_roles(role)
+    print("Added {member} to '{role}'".format(member=member.name, role=role))
     
-    #We couldn't find the role, tell the user and do nothing
-    if role_to_remove is None:
-        print("Role not found.")
-        await user.send("We couldn't find a matching {role_type} for '{name}'".format(role_type=role_type, name=name))
-        return
-    
-    #Check if the member has the role, tell the user and do nothing if they don't
-    has_role = await does_member_have_role(member, role_to_remove)
-    if not has_role:
-        await user.send("You aren't a member of that {role_type}!".format(role_type=role_type))
-        return
-    
-    #Finally, remove the role
-    print("Removing {user} from {role_type}-{name}".format(user=member.name, role_type=role_type, name=name))
-    await member.remove_roles(role_to_remove)
-    await user.send("You have been removed from the {role_type}!".format(role_type=role_type))
+async def leave_role(member, role):
+    print("We are removing {member} from '{role}'.".format(member=member, role=role))
+
+    await member.remove_roles(role)
+    print("Removed {member} from '{role}'".format(member=member.name, role=role))
 
 @client.event
 async def on_ready():
-    print(f'{client.user} has connect to Discord')
+    print("{client} has connect to Discord! Beginning initialization".format(client=client.user))
 
-    print("Categories:")
-    await populate_categories()
+    #Find and set the category ID(s) for each media type
+    games_category_id = discord.utils.get(client.guilds[0].categories, name=games_category_name).id
+    games.set_category_id(games_category_id)
 
-    print("Managed Roles:")
-    await get_existing_roles()
-    await create_missing_roles()
+    #Populate the channel list for each media type
+    games.get_channels(client.guilds[0])
+
+    #Populate the existing role list for each media type
+    games.get_roles(client.guilds[0])
+
+    #Create any missing roles for each media type
+    games.create_missing_roles(client.guilds[0])
+
+    print("Done with initialization!")
+    print()
+    print()
 
 @client.event
 async def on_message(message):
@@ -198,7 +86,8 @@ async def on_message(message):
     #Only listen to the bot channel for help
     if not isinstance(channel, discord.channel.DMChannel):
         if channel.name == "bot" and message.content == '!help':
-            print("Helping {user}".format(user=user))
+            print("{user} has requested help.".format(user=user))
+            helpmessage = config["General"]["helpmessage"]
             await message.author.send(helpmessage.format(user=user))
             await message.delete()
         elif channel.name == "bot":
@@ -215,22 +104,71 @@ async def on_message(message):
     #Message a user with available commands
     if message.content == '!help':
         print("{user} has requested help.".format(user=user))
+        helpmessage = config["General"]["helpmessage"]
         await user.send(helpmessage.format(user=user))
     
     #Games
     if message.content == '!games':
-        games_list = await get_games_list()
+        games_list = games.get_channel_list()
         await user.send("Here is the current game list:\n" + games_list)
     
     #Join a game role
     if message.content.startswith("!join game"):
-        game_to_join = message.content[11:]
-        await join_role(user, "game", game_to_join)
+        game_name = message.content[11:]
+        print("'{user}' has requested to join game channel for '{game_name}'".format(user=user.name, game_name=game_name))
+        member = await userToMember(user)
+        role = games.get_role(game_name)
+
+        #Is the user a member of the server?
+        if member is None:
+            print("User membership not found.")
+            await user.send("We could find your membership to a server!")
+            return
+
+        #Does the role exist?
+        if role is None:
+            print("Game not found.")
+            await user.send("We could find a matching game!")
+            return
+
+        #Is the member already in the role?
+        has_role = await does_member_have_role(member, role)
+        if has_role:
+            print("User already has role.")
+            await user.send("You are already a member of {game_name}".format(game_name=game_name))
+            return
+        
+        await join_role(member, role)
+        await user.send("You have been added to {game_name}!".format(game_name=game_name))
     
     #Leave a game role
     if message.content.startswith("!leave game"):
-        game_to_leave = message.content[12:]
-        await leave_role(user, "game", game_to_leave)
+        game_name = message.content[12:]
+        print("'{user}' has requested to leave game channel for '{game_name}'".format(user=user.name, game_name=game_name))
+        member = await userToMember(user)
+        role = games.get_role(game_name)
+
+        #Is the user a member of the server?
+        if member is None:
+            print("User membership not found.")
+            await user.send("We could find your membership to a server!")
+            return
+
+        #Does the role exist?
+        if role is None:
+            print("Game not found.")
+            await user.send("We could find a matching game!")
+            return
+
+        #Is the member part of the role?
+        has_role = await does_member_have_role(member, role)
+        if not has_role:
+            print("User doesn't have role.")
+            await user.send("You aren't a member of {game_name}".format(game_name=game_name))
+            return
+
+        await leave_role(member, role)
+        await user.send("You have been removed from {game_name}!".format(game_name=game_name))
 
 print("Starting Discord Bot")
-client.run('Mjk1ODk4NjY2Mzk1MjM4NDEw.WNkHGw.GXV8J8bh0XMk63Wv2VC8R7W-bSE')
+client.run(config["General"]["secret"])
