@@ -1,4 +1,4 @@
-# DiscordBot ✧*｡٩(ˊᗜˋ*)و✧*
+# DiscordBot
  
 This bot is meant to support media (games, movies, ect) in your discord channel.
 
