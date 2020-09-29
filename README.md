@@ -2,6 +2,11 @@
  
 This bot is meant to support media (games, movies, ect) in your discord channel.
 
+## Dependencies
+```
+discord.py https://discordpy.readthedocs.io/en/latest/
+```
+
 ## Configuration
 Set up your config.ini file in the same directory as app.py and add the following
 ```
