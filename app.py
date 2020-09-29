@@ -106,12 +106,9 @@ async def on_message(message):
     if user == client.user:
         return
     
-    #Mark the message as processed
-    await message.add_reaction("\N{SQUARED OK}")
-    
     #DMs should only be requesting help
     if isinstance(channel, discord.channel.DMChannel):
-        if message.content=="!help":
+        if message.content == "!help":
             logging.info("{user}\t{action}\t".format(user=user, action="request_help_dm"))
             helpmessage = generate_help()
             await message.author.send(helpmessage.format(user=user))
@@ -120,9 +117,16 @@ async def on_message(message):
             logging.info("{user}\t{action}\t'{message}'".format(user=user, action="invalid_dm_request",message=message.content))
             await message.author.send("Command not supported in DMs.")
             return
+    
+    #Only listen to the #bot channel from this point on
+    if channel.name != "bot":
+        return
 
     #Since the message isn't a DM, get the guild from which the message came
     guild = message.guild
+
+    #Mark the message as processed
+    await message.add_reaction("\N{SQUARED OK}")
 
     #Message a user with available commands
     if message.content == '!help':
